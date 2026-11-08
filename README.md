@@ -11,7 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/PvtLight/input-guard/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/PvtLight/input-guard?label=download&color=1f6f5c"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-1f6f5c">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-1f6f5c">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-no%20dependencies-1f6f5c">
@@ -57,9 +56,7 @@ Input Guard is the third option. Press **⌃⌥⌘L** and every key, click, scro
 
 Requires an Apple Silicon Mac with macOS 14 or later.
 
-**Download:** grab `Input-Guard.zip` from the [latest release](https://github.com/PvtLight/input-guard/releases/latest), unzip it, and move **Input Guard.app** to Applications. The app is not notarized, so the first time you open it macOS will refuse. Go to **System Settings → Privacy & Security** and click **Open Anyway**.
-
-**Or build it yourself** (needs Xcode or the Xcode Command Line Tools):
+Build it from source (needs Xcode or the Xcode Command Line Tools):
 
 ```sh
 git clone https://github.com/PvtLight/input-guard.git
