@@ -70,7 +70,7 @@ bash build.sh
 
 The script builds and signs `build/Input Guard.app` and runs the self-tests. Move the app to Applications and open it.
 
-**On Windows:** a first prototype is in [windows/](windows/README.md). It hasn't run on a Windows PC yet.
+**On Windows:** a first prototype, `InputGuard.exe`, is in the [latest release](https://github.com/PvtLight/input-guard/releases/latest). It hasn't run on a Windows PC yet, so start with its [checklist](windows/CHECKLIST.md). [windows/README.md](windows/README.md) has the details.
 
 ## First run
 
