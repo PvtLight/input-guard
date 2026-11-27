@@ -70,6 +70,8 @@ bash build.sh
 
 The script builds and signs `build/Input Guard.app` and runs the self-tests. Move the app to Applications and open it.
 
+**On Windows:** a first prototype is in [windows/](windows/README.md). It hasn't run on a Windows PC yet.
+
 ## First run
 
 1. Open Input Guard. A padlock appears in the menu bar and the setup window opens.
