@@ -40,6 +40,7 @@ Input Guard is the third option. Press **⌃⌥⌘L** and every key, click, scro
 ## Features
 
 - **One shortcut.** ⌃⌥⌘L locks from any app. The same shortcut brings up the unlock prompt; it never unlocks on its own.
+- **Works over remote control.** While locked, five quick clicks bring up the same unlock prompt, so you can unlock through Splashtop, Screen Sharing or a phone app, where the shortcut often doesn't get through. Clicks only open the prompt; your passphrase still unlocks. To lock remotely, click the padlock and choose **Lock Input**.
 - **Blocks everything you touch.** Keyboard, mouse, trackpad, and touch screens (built in, external, or a Sidecar iPad).
 - **Nothing stops.** The screen stays on and unlocked underneath, and the Mac and display don't go to sleep on their own while guarded. (Closing a laptop lid still sleeps it.)
 - **Touch ID or passphrase.** Your passphrase is separate from your Mac password and stored only as a salted PBKDF2 verifier in your login Keychain.
@@ -77,7 +78,7 @@ The script builds and signs `build/Input Guard.app` and runs the self-tests. Mov
 4. Optional: run the **15-Second Trial** to see that your keyboard, pointer and touch screen are blocked and that your passphrase works.
 5. Press **⌃⌥⌘L** (or choose **Lock Input** from the menu bar). The menu bar says **Agent working**. Walk away.
 
-To unlock, press **⌃⌥⌘L**. Scan your finger, or type your passphrase and press Return. Escape puts the prompt away and stays locked.
+To unlock, press **⌃⌥⌘L**, or click five times quickly. Scan your finger, or type your passphrase and press Return. Escape puts the prompt away and stays locked.
 
 ## If something goes wrong
 
@@ -95,7 +96,7 @@ Input Guard is built so that safety wins over staying locked:
 
 Terminal agents, builds, downloads and browser automation that talks to the browser directly don't use the keyboard or mouse, so they keep working with nothing extra.
 
-If an agent drives the Mac by sending clicks and keystrokes, turn on **Allow automation events** in Settings. Input Guard then lets through events that macOS marks as coming from software, and leaves the touch screen unblocked so automated clicks can reach apps. That marking is a convenience, not proof: remapping tools and remote-control apps can pass too. Try your setup during the 15-second trial before you rely on it.
+If an agent drives the Mac by sending clicks and keystrokes, turn on **Allow automation events** in Settings. Input Guard then lets through events that macOS marks as coming from software, and leaves the touch screen unblocked so automated clicks can reach apps. That marking is a convenience, not proof: remapping tools and remote-control apps can pass too. Try your setup during the 15-second trial before you rely on it. In this mode five clicks don't open the unlock prompt, because stray clicks at the Mac would pause the automation it lets through; from a remote session, click the padlock and choose **Unlock…** instead.
 
 ## What it is and isn't
 
@@ -109,7 +110,7 @@ For privacy, or against someone determined to get in, use the macOS lock screen.
 
 ## How it works
 
-Input Guard puts a Core Graphics event tap at the head of your login session and drops every keyboard, mouse, trackpad and gesture event while guarded. Touches never pass through that tap, so it also covers each screen with a clear window above everything else, menu bar and Dock included, that absorbs touches without taking focus. A separate `InputGuardRecovery` process trades heartbeats with the app and ends it if it stops responding.
+Input Guard puts a Core Graphics event tap at the head of your login session and drops every keyboard, mouse, trackpad and gesture event while guarded. Touches never pass through that tap, so it also covers each screen with a clear window above everything else, menu bar and Dock included, that absorbs touches without taking focus. Both count the clicks they stop, so five quick ones can open the unlock prompt. A separate `InputGuardRecovery` process trades heartbeats with the app and ends it if it stops responding.
 
 [docs/how-it-works.md](docs/how-it-works.md) has the full details: every shortcut and passthrough rule, the recovery design, the passphrase storage, what's tested automatically and what has been checked by hand.
 
@@ -120,6 +121,7 @@ Input Guard puts a Core Graphics event tap at the head of your login session and
 - PBKDF2 known-answer, passphrase and attempt-limit tests.
 - Every press and release order of the lock shortcut, ⌃⌘Q, and 50,000 random key events, replayed through the same filter the live tap uses.
 - The unlock prompt and the screen-lock and user-switch resets.
+- Five-click timing: five quick clicks open the unlock prompt, slow or stray clicks don't, and every click stays blocked from apps.
 - Seven process-level recovery tests: a frozen app, the trial's hard deadline, a killed helper, a frozen helper, a clean stop, a missing helper, and a healthy session with no deadline.
 
 Two more checks run against the built app:

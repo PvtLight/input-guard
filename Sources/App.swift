@@ -50,6 +50,7 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var prompt = UnlockPrompt()
     private var verifying = false
     private var limiter = AttemptLimiter()
+    private var clicks = ClickUnlock()
     private var auth: LAContext?
     private var session = UUID()
     private var lastPrompt: TimeInterval = 0
@@ -69,6 +70,7 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSApp.appearance = NSAppearance(named: .aqua)
         }
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        touchShield.onClick = { [weak self] in self?.clicked() }
         let shortcut = GlobalHotKey { [weak self] in self?.activateShortcut() }
         do { try shortcut.register(); globalHotKey = shortcut }
         catch { shortcutStatus = error.localizedDescription }
@@ -163,7 +165,7 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func updateMenu() {
         status.button?.image = NSImage(systemSymbolName: locked ? "lock.fill" : "lock.open", accessibilityDescription: "Input Guard")
         status.button?.title = locked ? (testDeadline == nil ? " Agent working" : " TEST") : ""
-        status.button?.toolTip = locked ? "Agent working · ⌃⌥⌘L to resume input" : "Input Guard · ⌃⌥⌘L to start"
+        status.button?.toolTip = locked ? "Agent working · ⌃⌥⌘L\(allowAutomation ? "" : " or 5 clicks") to resume input" : "Input Guard · ⌃⌥⌘L to start"
         let menu = NSMenu()
         let lockItem = menu.addItem(withTitle: locked ? "Unlock…" : "Lock Input", action: #selector(lockOrUnlock), keyEquivalent: "")
         menu.autoenablesItems = false
@@ -311,7 +313,8 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let shortcut = label("⌃ ⌥ ⌘ L", size: 23, weight: .medium)
         let shortcutHelp = secondary("Lock input now. Use it again to enter your unlock code.")
-        addFullWidth(card("Your shortcut", content: [shortcut, shortcutHelp]), to: overview)
+        let clickHelp = secondary("While locked, 5 quick clicks also open the unlock prompt, for remote control where the shortcut can't get through.")
+        addFullWidth(card("Your shortcut", content: [shortcut, shortcutHelp, clickHelp]), to: overview)
         // Registration failures remain visible; normal instructions fit in the shortcut card.
         if globalHotKey == nil { addFullWidth(secondary(shortcutStatus), to: overview) }
         let accessStatus = secondary("")
@@ -346,7 +349,7 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         addFullWidth(card("Your passphrase", content: passwordViews), to: settings)
         automationCheckbox = NSButton(checkboxWithTitle: "Allow automation events", target: self, action: #selector(changeAutomation))
         automationCheckbox.state = allowAutomation ? .on : .off
-        addFullWidth(card("Automation · experimental", subtitle: "Allows input marked as software. Keyboard remappers may also pass through, and the touch screen is left unblocked so automated clicks can reach apps. Test your setup before relying on it.", content: [automationCheckbox]), to: settings)
+        addFullWidth(card("Automation · experimental", subtitle: "Allows input marked as software. Keyboard remappers may also pass through, and the touch screen is left unblocked so automated clicks can reach apps. 5 quick clicks no longer open the unlock prompt; over remote control, use the padlock menu. Test your setup before relying on it.", content: [automationCheckbox]), to: settings)
         addFullWidth(card("Built-in recovery", content: [
             secondary("No time limit in normal sessions. Resume with your passphrase or Touch ID, or lock and unlock macOS with ⌃⌘Q."),
             secondary("The trial releases input after 15 seconds. If Input Guard freezes, a separate recovery process releases input."),
@@ -476,6 +479,7 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             session = UUID()
             testDeadline = test ? hardDeadline : nil
             limiter = AttemptLimiter()
+            clicks = ClickUnlock()
             tapInterrupted = false
             setup?.close()
             updateMenu()
@@ -511,6 +515,9 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Do not intercept the power key. Forced restart remains an OS recovery path.
         if type.rawValue == 14, let ns = NSEvent(cgEvent: event), ns.subtype.rawValue == 8,
            ((ns.data1 >> 16) & 0xffff) == 6 { return Unmanaged.passUnretained(event) }
+        // Blocked like every other click, and counted toward the five that
+        // open the unlock prompt.
+        if type == .leftMouseDown { clicked() }
         if type == .keyDown {
             let key = event.getIntegerValueField(.keyboardEventKeycode)
             let mods = event.flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift])
@@ -537,6 +544,15 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
         return nil
+    }
+
+    // Five quick clicks open the unlock prompt, as ⌃⌥⌘L does; they never unlock.
+    // Runs on the main thread, for clicks the tap blocks (mouse, trackpad, and
+    // remote-control apps) and touches that land on the shield.
+    private func clicked() {
+        guard locked, ClickUnlock.counts(allowAutomation: allowAutomation, enteringPassword: enteringPassword),
+              clicks.click(at: now) else { return }
+        DispatchQueue.main.async { [weak self] in self?.showUnlock() }
     }
 
     private func checkHealth() {
@@ -611,15 +627,18 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func updatePanelNote() {
+        let clicksOpen = !allowAutomation // five quick clicks open the prompt too
         if enteringPassword {
             panelTitle?.stringValue = "Resume input"
             note?.stringValue = prompt.note
         } else if let deadline = testDeadline {
             panelTitle?.stringValue = "Input test"
             note?.stringValue = "TEST MODE · releases automatically in \(max(0, Int(ceil(deadline - now)))) seconds.\nTry the keyboard\(touchShield.isRaised ? ", trackpad, and touch screen" : " and trackpad") now."
+                + (clicksOpen ? "\nFive quick clicks open the unlock prompt." : "")
         } else {
             panelTitle?.stringValue = "Agent working"
-            note?.stringValue = "Press ⌃⌥⌘L when you're ready to resume input."
+            note?.stringValue = clicksOpen ? "Press ⌃⌥⌘L or click 5 times when you're ready to resume input."
+                                           : "Press ⌃⌥⌘L when you're ready to resume input."
         }
         updateDots()
     }
@@ -725,7 +744,7 @@ final class GuardApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 @main enum Main {
     static func main() {
         if CommandLine.arguments.contains("--self-test") {
-            do { try runSelfTests(); try runTapFilterTests(); try runUnlockPromptTests(); try runSessionResetTests() }
+            do { try runSelfTests(); try runTapFilterTests(); try runUnlockPromptTests(); try runClickUnlockTests(); try runSessionResetTests() }
             catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
             return
         }

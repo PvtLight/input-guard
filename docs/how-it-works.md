@@ -48,6 +48,30 @@ safety reset. The independent freeze recovery is retained. A real macOS
 lock/unlock cycle still needs an attended verification; the automated notification
 tests use isolated in-process centers and do not lock the computer.
 
+## Five clicks
+
+Over remote control (Splashtop, Screen Sharing, or a phone or tablet app) the
+shortcut often doesn't arrive: the computer you're typing on may keep it for
+itself (Windows keeps Windows-key shortcuts such as Win+L, and a copy of Input
+Guard running there takes Control–Option–Command–L), or the app can't send
+three modifier keys at once. So while guarded, **five clicks within three
+seconds** open the same unlock prompt as the shortcut. Clicks from the mouse,
+the trackpad, or a remote-control app count, and so do taps on a touch screen,
+anywhere on screen. They never unlock by themselves: the passphrase or Touch ID
+is still needed, and the clicks stay blocked from apps like every other click.
+Touch ID isn't in reach over remote control, so type the passphrase.
+
+The guard's own tap counts the clicks it drops, and the touch shield counts the
+taps it absorbs; only their times are kept, the last few seconds at most.
+Nothing is watched while unguarded, so clicks never start a lock. To lock from
+a remote session, click the menu-bar padlock and choose **Lock Input**.
+
+Clicks are not counted while the prompt is open, or when **Allow automation
+events** is on: clicks marked as software pass to apps then, and a prompt
+opened by stray clicks at the Mac would pause that automation until someone
+answered it. In that mode a remote session can click the padlock and choose
+**Unlock…** instead.
+
 ## Touch screens
 
 Touches on a touch screen never reach the session event tap: macOS hands each
@@ -134,7 +158,8 @@ still needs a live attended verification in this version.
    desktop visible and its focus unchanged. The Mac and display stay awake while
    guarded. Closing a laptop lid, manual sleep, power loss, and OS policy can
    still suspend work. macOS screen lock/unlock or user switching releases this custom lock.
-6. Press **Control–Option–Command–L** to request unlock. If Touch ID is
+6. Press **Control–Option–Command–L**, or click five times quickly, to request
+   unlock. If Touch ID is
    available it starts right away: scan an enrolled finger. Or type your Input
    Guard passphrase and press Return; typing closes the Touch ID request, and
    Tab starts it again. No shortcut alone unlocks a normal session. Escape dismisses the
@@ -157,6 +182,7 @@ can generate or relabel input. Software may bypass the tap entirely. This mode
 is off by default. Do not rely on it for adversarial physical access protection.
 Synthetic events are suspended during passphrase entry. Touch screens are not
 blocked in this mode: the window that blocks them would also catch automated clicks.
+Five clicks don't open the unlock prompt in this mode (see Five clicks).
 
 Test the desired automation during a 15-second trial. Also test physical input
 with every connected keyboard, mouse, trackpad, and remapping tool. A successful
@@ -209,6 +235,8 @@ known PBKDF2 vector, password verification, invalid records, attempt limiting,
 and event policy, a replay of every press and release order of the shortcut
 (plus Control–Command–Q and 50,000 random key events) through the tap's filter,
 the unlock prompt (Return with nothing typed, Return during a delay, Caps Lock),
+five-click timing (quick, slow, bunched-up and expired clicks, and clicks staying
+blocked),
 and four isolated notification-observer checks. It then runs
 seven process-level recovery tests: a frozen UI process (`SIGSTOP`) in an
 untimed session, independent trial deadline expiry, killed helper, frozen helper,
@@ -240,7 +268,9 @@ This verifies fresh launch behavior; it does not restart or log out of the Mac.
 To check where clicks and touches would land while guarded, run the touch shield
 check. It raises the shield for about a second, with no input tap, asks macOS
 which window a click or touch would reach on a grid over every screen, and
-lowers it again. It also works while another copy is running:
+lowers it again. It also hands each shield window a made-up click, without
+posting anything to macOS, to check it counts toward the five-click prompt.
+It also works while another copy is running:
 
 ```sh
 'build/Input Guard.app/Contents/MacOS/InputGuard' --touch-shield-check

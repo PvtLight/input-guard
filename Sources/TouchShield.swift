@@ -9,11 +9,20 @@ import AppKit
 // crashes, or is ended by its recovery helper, macOS removes it.
 final class TouchShield {
     private final class Panel: NSPanel {
+        var onClick: (() -> Void)?
         override var canBecomeKey: Bool { false }
         override var canBecomeMain: Bool { false }
+        // A touch arrives here as a click. Report it; it still goes nowhere.
+        override func sendEvent(_ event: NSEvent) {
+            if event.type == .leftMouseDown { onClick?() }
+            super.sendEvent(event)
+        }
     }
     private var panels: [Panel] = []
     private var frames: [NSRect] = []
+    // Called for each click or touch that lands on the shield, toward the
+    // five quick clicks that open the unlock prompt.
+    var onClick: (() -> Void)?
 
     // Stays true while screens come and go, so the health check keeps raising it.
     private(set) var isRaised = false
@@ -28,7 +37,11 @@ final class TouchShield {
         if screens != frames {
             replaced = panels
             frames = screens
-            panels = screens.map(Self.panel)
+            panels = screens.map { frame in
+                let panel = Self.panel(frame)
+                panel.onClick = { [weak self] in self?.onClick?() }
+                return panel
+            }
         }
         for panel in panels where !covers(panel) { panel.orderFrontRegardless() }
         // Only after the new ones are up, so no touch slips through a display change.
@@ -119,7 +132,23 @@ func runTouchShieldCheck() throws {
     try check(misses == 0, "\(points - misses) of \(points) click and touch points on \(numbers.count) screen(s) reach the shield, menu bar and Dock included")
     shield.raise()
     try check(shield.windowNumbers == numbers, "Raising again over the same screens keeps the same windows")
-    let gestures = NSApp.windows.filter { numbers.contains($0.windowNumber) }
+    // A touch reaches the shield as a click. Hand made-up events straight to
+    // each shield window (nothing is posted to macOS): only presses count.
+    var reported = 0
+    shield.onClick = { reported += 1 }
+    let shieldWindows = NSApp.windows.filter { numbers.contains($0.windowNumber) }
+    for window in shieldWindows {
+        for type: NSEvent.EventType in [.leftMouseDown, .leftMouseUp, .mouseMoved] {
+            guard let event = NSEvent.mouseEvent(with: type, location: NSPoint(x: 40, y: 40), modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) else { continue }
+            window.sendEvent(event)
+        }
+    }
+    shield.onClick = nil
+    try check(reported == shieldWindows.count,
+              "A click or touch on each shield window counts toward the five-click unlock prompt (\(reported) of \(shieldWindows.count))")
+    let gestures = shieldWindows
         .filter { $0.responds(to: NSSelectorFromString("disablesDirectTouchSystemGestures")) }
     try check(gestures.allSatisfy { $0.value(forKey: "disablesDirectTouchSystemGestures") as? Bool == true },
               gestures.isEmpty ? "System touch gestures: not offered by this macOS" : "System touch gestures are off over the shield")

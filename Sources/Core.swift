@@ -207,6 +207,34 @@ struct TapFilter {
     }
 }
 
+// Five quick clicks while guarded open the unlock prompt, as Control–Option–
+// Command–L does, for remote-control apps that can't send the shortcut. They
+// never unlock: the passphrase or Touch ID is still needed, and the clicks
+// themselves stay blocked. Only clicks the guard blocks are counted; nothing
+// is watched while unguarded.
+struct ClickUnlock {
+    static let clicks = 5
+    static let window: TimeInterval = 3
+    private(set) var recent: [TimeInterval] = []
+
+    // Clicks count while the prompt is closed, and not with automation allowed:
+    // software clicks pass then, and a prompt opened by stray clicks at the Mac
+    // would pause that automation until someone answered it.
+    static func counts(allowAutomation: Bool, enteringPassword: Bool) -> Bool {
+        !allowAutomation && !enteringPassword
+    }
+
+    // True on the click that makes five within three seconds. The count then
+    // starts over, so opening the prompt again takes five more.
+    mutating func click(at now: TimeInterval) -> Bool {
+        recent.removeAll { now - $0 >= Self.window }
+        recent.append(now)
+        guard recent.count >= Self.clicks else { return false }
+        recent.removeAll()
+        return true
+    }
+}
+
 func runSelfTests() throws {
     func check(_ ok: @autoclosure () -> Bool, _ name: String) throws {
         if !ok() { throw GuardError.message("FAILED: \(name)") }
@@ -463,4 +491,45 @@ func runUnlockPromptTests() throws {
     for _ in 0..<130 { long.type("x") }
     try check(typing.candidate == "ab C" && long.candidate.utf8.count == 128,
               "Typing still takes printable ASCII only, up to 128 characters, and Delete removes one")
+}
+
+// Replays click timings through ClickUnlock, and clicks through TapFilter.
+// No tap is created and nothing is posted.
+func runClickUnlockTests() throws {
+    func check(_ ok: @autoclosure () -> Bool, _ name: String) throws {
+        if !ok() { throw GuardError.message("FAILED: \(name)") }
+        print("PASS: \(name)")
+    }
+    // Which clicks, counting from 1, open the prompt.
+    func opens(_ times: [TimeInterval]) -> [Int] {
+        var counter = ClickUnlock()
+        return times.indices.filter { counter.click(at: times[$0]) }.map { $0 + 1 }
+    }
+    try check(opens([0, 0.2, 0.4, 0.6, 0.8]) == [5], "Five quick clicks open the unlock prompt on the fifth")
+    try check(opens([0, 0.2, 0.4, 0.6]) == [], "Four clicks do nothing")
+    try check(opens(Array(stride(from: 0, to: 60, by: 0.8))) == [],
+              "Steady clicking, one every 0.8 seconds for a minute, never opens it")
+    try check(opens([0, 1.9, 1.95, 2, 2.05]) == [5],
+              "Clicks bunched up by remote-control lag still count when five land within 3 seconds")
+    try check(opens(Array(stride(from: 0, to: 2, by: 0.2))) == [5, 10],
+              "The count starts over after opening: ten quick clicks open it twice")
+    try check(opens([0, 0.1, 0.2, 0.3, 3.4, 3.5, 3.6, 3.7, 3.8]) == [9], "Clicks older than 3 seconds drop out of the count")
+    try check(ClickUnlock.counts(allowAutomation: false, enteringPassword: false) &&
+              !ClickUnlock.counts(allowAutomation: true, enteringPassword: false) &&
+              !ClickUnlock.counts(allowAutomation: false, enteringPassword: true),
+              "Clicks count only while the prompt is closed and automation events are not allowed")
+    var filter = TapFilter(held: [])
+    let mice: [(CGEventType, CGMouseButton)] = [(.leftMouseDown, .left), (.leftMouseUp, .left), (.rightMouseDown, .right),
+        (.otherMouseDown, .center), (.mouseMoved, .left), (.leftMouseDragged, .left)]
+    let held: [CGEventFlags] = [[], [.maskCommand, .maskControl], [.maskCommand, .maskControl, .maskAlternate]]
+    var blocked = 0
+    for (type, button) in mice {
+        for flags in held {
+            let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: .zero, mouseButton: button)!
+            event.flags = flags
+            if !filter.allows(type, event, automation: false) { blocked += 1 }
+        }
+    }
+    try check(blocked == mice.count * held.count,
+              "Clicks and pointer moves stay blocked while guarded, with or without the lock keys held (\(blocked) of \(mice.count * held.count))")
 }
