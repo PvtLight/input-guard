@@ -37,6 +37,12 @@ Input Guard is the third option. Press **⌃⌥⌘L** and every key, click, scro
   <img src="docs/images/flow-light.png" alt="Step 1: press Control-Option-Command-L and walk away; the Agent working notice appears. Step 2: press it again when you're back and unlock with Touch ID or your passphrase.">
 </picture>
 
+## What it's for
+
+- **Stepping away from a running agent.** Lock it, get up, and check its progress from across the room. Nobody can type into its terminal while you're gone.
+- **Overnight runs.** Start a long job, lock, and go to bed. The Mac and display stay awake and the screen doesn't lock, so the job keeps running until morning. (A laptop still sleeps if you close the lid.)
+- **A Mac that's always on.** A machine in a server room, behind a wall display or in a lab that stays on and unlocked around the clock, showing its screen and running agents. Nobody at its keyboard can use it without your passphrase or fingerprint, and neither can a remote-control session unless you turn on **Allow automation events**. When you need to get in from far away, five quick clicks over Splashtop or Screen Sharing bring up the unlock prompt. See [What it is and isn't](#what-it-is-and-isnt) for what it doesn't cover.
+
 ## Features
 
 - **One shortcut.** ⌃⌥⌘L locks from any app. The same shortcut brings up the unlock prompt; it never unlocks on its own.
@@ -107,6 +113,8 @@ Input Guard keeps hands off your Mac while you're away. It is not a security loc
 - Your desktop stays visible, so anyone walking by can read the screen.
 - Anyone can still press ⌃⌘Q, which ends the guard but leaves them at the macOS lock screen.
 - The power button works, and holding it restarts the Mac.
+- Remote viewers see the screen too. Anyone on a remote-control session can bring up the unlock prompt and guess, though each wrong passphrase makes the next try wait longer, up to 30 seconds. Choose one nobody could guess.
+- It doesn't touch SSH, file sharing or anything else that reaches the Mac over the network. On an always-on Mac, turn off what you don't use in **System Settings → General → Sharing**.
 
 For privacy, or against someone determined to get in, use the macOS lock screen.
 
